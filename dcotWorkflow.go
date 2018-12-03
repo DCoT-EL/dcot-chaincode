@@ -257,7 +257,7 @@ func (t *DcotWorkflowChaincode) completeTrasfer(stub shim.ChaincodeStubInterface
 	}
 	if callerRole == CALLER_ROLE_0 || callerRole == CALLER_ROLE_1 {
 		logger.Error("completeTrasfer ERROR: Access denied for a member or an admin!!")
-		shim.Error("completeTrasfer ERROR: Access denied for a member or an admin!!")
+		return shim.Error("completeTrasfer ERROR: Access denied for a member or an admin!!")
 	}
 
 	COCKey, err = getCOCKey(stub, args[0])
