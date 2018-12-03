@@ -3,13 +3,13 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 	pb "github.com/hyperledger/fabric/protos/peer"
 	"github.com/rs/xid"
 )
 
 var logger = shim.NewLogger("dcot-chaincode-log")
-
 
 type DcotWorkflowChaincode struct {
 	testMode bool
@@ -80,10 +80,9 @@ func (t *DcotWorkflowChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Resp
 	return shim.Error("Invalid invoke function name")
 }
 
-//INITNEWCHAIN: the input json must contain the DocumentID, 
-//The caller must be a MEMBER!!!
+//INITNEWCHAIN: the input json must contain the DocumentID,
+//The caller must be a MEMBER/ADMIN!!!
 //Custodian is the member UID!!!
-
 
 func (t *DcotWorkflowChaincode) initNewChain(stub shim.ChaincodeStubInterface, isEnabled bool, args []string) pb.Response {
 
@@ -118,9 +117,9 @@ func (t *DcotWorkflowChaincode) initNewChain(stub shim.ChaincodeStubInterface, i
 		logger.Error("initNewChain ERROR: getTxCreatorInfo()...\n")
 		return shim.Error(err.Error())
 	}
-	if callerRole != CALLER_ROLE_0 {
-		logger.Error("initNewChain ERROR: the user's role must be a member\n")
-		return shim.Error("initNewChain ERROR: the user's role must be a member\n")
+	if callerRole != CALLER_ROLE_0 && callerRole != CALLER_ROLE_1 {
+		logger.Error("initNewChain ERROR: the user's role must be a member or administrator!\n")
+		return shim.Error("initNewChain ERROR: the user's role must be a member CALLER_ROLE_1\n")
 	}
 	if len(callerUID) == 0 {
 		logger.Error("initNewChain ERROR: caller_UID is empty!!!\n")
@@ -154,11 +153,7 @@ func (t *DcotWorkflowChaincode) initNewChain(stub shim.ChaincodeStubInterface, i
 	return shim.Success([]byte(jsonResp))
 }
 
-
-
-
-
-//STARTTRASFER: ChainOfCustody must exist and have 'IN_CUSTODY' status, 
+//STARTTRASFER: ChainOfCustody must exist and have 'IN_CUSTODY' status,
 //the caller must be the current custodian(Delivery_Man)
 
 func (t *DcotWorkflowChaincode) startTransfer(stub shim.ChaincodeStubInterface, isEnabled bool, args []string) pb.Response {
@@ -182,11 +177,11 @@ func (t *DcotWorkflowChaincode) startTransfer(stub shim.ChaincodeStubInterface, 
 	if err != nil {
 		return shim.Error(err.Error())
 	}
-	if callerRole == CALLER_ROLE_1 {
-		logger.Error("startTransfer ERROR: Access denied for a Admin!!\n")
-		return shim.Error("startTransfer ERROR: Access denied for a Admin!!!")
-	}
-	
+	//if callerRole == CALLER_ROLE_1 {
+	//	logger.Error("startTransfer ERROR: Access denied for a Admin!!\n")
+	//	return shim.Error("startTransfer ERROR: Access denied for a Admin!!!")
+	//}
+
 	COCKey, err = getCOCKey(stub, args[0])
 	if err != nil {
 		logger.Error("startTransfer ERROR: getCOCKey()\n")
@@ -219,7 +214,6 @@ func (t *DcotWorkflowChaincode) startTransfer(stub shim.ChaincodeStubInterface, 
 		return shim.Error(err.Error())
 	}
 
-
 	chainOfCustody.Event = event
 	logger.Info("startTransferAsset: New DeliveryMan: \n", chainOfCustody.DeliveryMan)
 	byteCOC, err = json.Marshal(&chainOfCustody)
@@ -238,10 +232,8 @@ func (t *DcotWorkflowChaincode) startTransfer(stub shim.ChaincodeStubInterface, 
 	return shim.Success(nil)
 }
 
-
 //COMPLETETRASFER: ChainOfCustody must exist and have 'TRANSFER_PENDING' status,
-//The caller must be a new designed receiver(Delivery_Man) 
-
+//The caller must be a new designed receiver(Delivery_Man)
 
 func (t *DcotWorkflowChaincode) completeTrasfer(stub shim.ChaincodeStubInterface, isEnabled bool, args []string) pb.Response {
 
@@ -256,7 +248,6 @@ func (t *DcotWorkflowChaincode) completeTrasfer(stub shim.ChaincodeStubInterface
 	var operation string
 	var event Event
 
-
 	if len(args) != 1 {
 		return shim.Error("completeTrasfer ERROR: this method must want exactly one argument!!")
 	}
@@ -264,11 +255,10 @@ func (t *DcotWorkflowChaincode) completeTrasfer(stub shim.ChaincodeStubInterface
 	if err != nil {
 		return shim.Error(err.Error())
 	}
-	if callerRole == CALLER_ROLE_0 || callerRole == CALLER_ROLE_1{
+	if callerRole == CALLER_ROLE_0 || callerRole == CALLER_ROLE_1 {
 		logger.Error("completeTrasfer ERROR: Access denied for a member or an admin!!")
-		shim.Error("")
+		shim.Error("completeTrasfer ERROR: Access denied for a member or an admin!!")
 	}
-	
 
 	COCKey, err = getCOCKey(stub, args[0])
 	if err != nil {
@@ -284,7 +274,7 @@ func (t *DcotWorkflowChaincode) completeTrasfer(stub shim.ChaincodeStubInterface
 
 	err = json.Unmarshal([]byte(chainOfCustodyBytes), &chainOfCustody)
 	if err != nil {
-		logger.Error("completeTrasfer ERROR: json.Unmarshal()\n")		
+		logger.Error("completeTrasfer ERROR: json.Unmarshal()\n")
 		return shim.Error(err.Error())
 	}
 	if callerUID != chainOfCustody.DeliveryMan {
@@ -327,11 +317,8 @@ func (t *DcotWorkflowChaincode) completeTrasfer(stub shim.ChaincodeStubInterface
 	return shim.Success(nil)
 }
 
-
-
 //COMMENTCHAIN
 //The call must be a OPERATOR or DELIVERY_OPERATOR or ADMIN
-
 
 func (t *DcotWorkflowChaincode) commentChain(stub shim.ChaincodeStubInterface, isEnabled bool, args []string) pb.Response {
 
@@ -367,7 +354,7 @@ func (t *DcotWorkflowChaincode) commentChain(stub shim.ChaincodeStubInterface, i
 	if err != nil {
 		return shim.Error(err.Error())
 	}
-	if callerRole == CALLER_ROLE_0{
+	if callerRole == CALLER_ROLE_0 {
 		logger.Error("commentChain ERROR: Access denied for a member!!\n")
 		shim.Error("commentChain ERROR: Access denied for a member!!")
 	}
@@ -406,12 +393,7 @@ func (t *DcotWorkflowChaincode) commentChain(stub shim.ChaincodeStubInterface, i
 
 }
 
-
-
-
 //CANCELTRASFER
-
-
 
 func (t *DcotWorkflowChaincode) cancelTrasfer(stub shim.ChaincodeStubInterface, isEnabled bool, args []string) pb.Response {
 
@@ -448,15 +430,25 @@ func (t *DcotWorkflowChaincode) cancelTrasfer(stub shim.ChaincodeStubInterface, 
 		logger.Error("cancelTrasfer ERROR:  Asset have not status TRANSFER_PENDING!!\n")
 		return shim.Error("cancelTrasfer ERROR : Asset have not status TRANSFER_PENDING!!")
 	}
-	
+
 	callerRole, callerUID, err = getTxCreatorInfo(stub)
 	if err != nil {
 		return shim.Error(err.Error())
+	}
+	if callerRole == CALLER_ROLE_2 || callerRole == CALLER_ROLE_3 {
+		logger.Error("cancelTransfer ERROR: caller is a operator/delivery_operator!")
+		return shim.Error("cancelTransfer ERROR: caller is a operator/delivery_operator!")
 	}
 	if callerUID == chainOfCustody.DeliveryMan || callerRole == CALLER_ROLE_1 {
 		logger.Info("cancelTrasfer: Ok! Caller confirmed!!\n")
 		operation = "cancelTrasfer"
 		chainOfCustody.Status = IN_CUSTODY
+
+		if callerRole == CALLER_ROLE_1 {
+			chainOfCustody.DeliveryMan = callerUID
+			logger.Info("cancelTransfer: Administration operation, new delivery man set!", callerUID)
+		}
+
 		event, err = createEvent(stub, callerUID, callerRole, operation)
 		if err != nil {
 			logger.Error("cancelTrasfer ERROR: createEvent()\n")
@@ -485,9 +477,8 @@ func (t *DcotWorkflowChaincode) cancelTrasfer(stub shim.ChaincodeStubInterface, 
 	return shim.Error("cancelTrasfer ERROR : The caller must be the current custodian or have administrator role!!")
 }
 
-
 //TERMINATECHAIN
-//The calle must be a Admin or the current custodian!!! 
+//The calle must be a Admin or the current custodian!!!
 
 func (t *DcotWorkflowChaincode) terminateChain(stub shim.ChaincodeStubInterface, isEnabled bool, args []string) pb.Response {
 
@@ -530,13 +521,13 @@ func (t *DcotWorkflowChaincode) terminateChain(stub shim.ChaincodeStubInterface,
 		logger.Error("terminateChain ERROR: getTxCreatorInfo\n")
 		return shim.Error(err.Error())
 	}
-	if callerRole == CALLER_ROLE_0 || callerRole == CALLER_ROLE_2{
+	if callerRole == CALLER_ROLE_0 || callerRole == CALLER_ROLE_2 {
 		logger.Error("terminateChain ERROR : Access denied for member or operator!!\n")
 		return shim.Error("terminateChain ERROR : Access denied for member or operator!!")
 	}
 
 	if callerRole == CALLER_ROLE_1 || callerUID == chainOfCustody.DeliveryMan {
-		
+
 		logger.Info("terminateChain: Ok! Caller confirmed!!\n")
 
 		chainOfCustody.Status = RELEASED
@@ -569,10 +560,7 @@ func (t *DcotWorkflowChaincode) terminateChain(stub shim.ChaincodeStubInterface,
 	return shim.Error("terminateChain ERROR : The caller must be the current custodian ora have a administrator role!!")
 }
 
-
-
 //UPDATEDOCUMENT
-
 
 func (t *DcotWorkflowChaincode) updateDocument(stub shim.ChaincodeStubInterface, isEnabled bool, args []string) pb.Response {
 
@@ -612,7 +600,7 @@ func (t *DcotWorkflowChaincode) updateDocument(stub shim.ChaincodeStubInterface,
 		logger.Info("updateDocument ERROR: getTxCreatorInfo()\n")
 		return shim.Error(err.Error())
 	}
-	if callerRole == CALLER_ROLE_1{
+	if callerRole == CALLER_ROLE_1 {
 		logger.Info("updateDocument: Ok! Caller confirmed!!\n")
 
 		if chainOfCustody.Status != IN_CUSTODY {
@@ -651,14 +639,8 @@ func (t *DcotWorkflowChaincode) updateDocument(stub shim.ChaincodeStubInterface,
 	return shim.Error("cancelTrasfer ERROR : the user's role is not compatible with this operation!!\n")
 }
 
-
-
-
-
-
-//GETASSETDETAILS 
+//GETASSETDETAILS
 //The calle must be a Delivery_operator or Operator or Admin!!
-
 
 func (t *DcotWorkflowChaincode) getAssetDetails(stub shim.ChaincodeStubInterface, isEnabled bool, args []string) pb.Response {
 
@@ -695,7 +677,7 @@ func (t *DcotWorkflowChaincode) getAssetDetails(stub shim.ChaincodeStubInterface
 		logger.Error("getAssetDetails ERROR : getTxCreatorInfo\n")
 		return shim.Error(err.Error())
 	}
-	if callerRole == CALLER_ROLE_1 || callerRole == CALLER_ROLE_2 || callerRole == CALLER_ROLE_3{
+	if callerRole == CALLER_ROLE_1 || callerRole == CALLER_ROLE_2 || callerRole == CALLER_ROLE_3 {
 		logger.Info("getAssetDetails: Ok! Caller confirmed!!\n")
 		byteCOC, err = json.Marshal(&chainOfCustody)
 		if err != nil {
@@ -710,13 +692,8 @@ func (t *DcotWorkflowChaincode) getAssetDetails(stub shim.ChaincodeStubInterface
 	return shim.Error("getAssetDetails ERROR : the user's role is not compatible with this operation!\n")
 }
 
-
-
-
 //GETCHAINOFEVENTS
 //The caller must be a Admin!!!
-
-
 
 func (t *DcotWorkflowChaincode) getChainOfEvents(stub shim.ChaincodeStubInterface, isEnabled bool, args []string) pb.Response {
 
@@ -730,8 +707,6 @@ func (t *DcotWorkflowChaincode) getChainOfEvents(stub shim.ChaincodeStubInterfac
 	var callerRole string
 	var err error
 
-
-
 	if len(args) != 1 {
 		return shim.Error("getChainOfEvents ERROR: this method must want exactly one argument!!")
 	}
@@ -741,7 +716,7 @@ func (t *DcotWorkflowChaincode) getChainOfEvents(stub shim.ChaincodeStubInterfac
 		return shim.Error(err.Error())
 	}
 	logger.Info("caller_ROLE :" + string(callerRole) + " . \n")
-	if callerRole == CALLER_ROLE_1{
+	if callerRole == CALLER_ROLE_1 {
 		logger.Info("getChainOfEvents: Ok! Caller confirmed!!\n")
 		COCKey, err2 = getCOCKey(stub, args[0])
 		if err2 != nil {
@@ -785,15 +760,6 @@ func (t *DcotWorkflowChaincode) getChainOfEvents(stub shim.ChaincodeStubInterfac
 	return shim.Error("getChainOfEvents ERROR : the user's role is not compatible with this operation!\n")
 
 }
-
-
-
-
-
-
-
-
-
 
 func main() {
 	twc := new(DcotWorkflowChaincode)
